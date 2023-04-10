@@ -1,0 +1,82 @@
+ #include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+#define MAX_INGREDIENTS 10
+
+int num_chefs;
+int max_ingredients;
+int total_ingredients = 0;
+pthread_mutex_t ingredient_lock[MAX_INGREDIENTS];
+
+void *chef(void *arg) {
+    int id = *((int *)arg);
+    int num_ingredients = rand() % (max_ingredients + 1);
+
+    printf("Chef %d is requesting %d ingredients\n", id, num_ingredients);
+
+    // Acquire the necessary ingredients
+    int acquired_ingredients = 0;
+    while (acquired_ingredients < num_ingredients) {
+        for (int i = id; i < id + num_ingredients; i++) {
+            pthread_mutex_lock(&ingredient_lock[i % MAX_INGREDIENTS]);
+            acquired_ingredients++;
+            printf("Chef %d acquired ingredient %d (%d/%d)\n", id, i % MAX_INGREDIENTS, acquired_ingredients, num_ingredients);
+            if (acquired_ingredients == num_ingredients) {
+                break;
+            }
+        }
+    }
+
+    printf("Chef %d is working with the ingredients...\n", id);
+    sleep(2);
+
+    // Release the acquired ingredients
+    for (int i = id + num_ingredients - 1; i >= id; i--) {
+        printf("Chef %d released ingredient %d\n", id, i % MAX_INGREDIENTS);
+        pthread_mutex_unlock(&ingredient_lock[i % MAX_INGREDIENTS]);
+    }
+
+    return NULL;
+}
+
+int main() {
+    // Initialize the ingredient locks
+    for (int i = 0; i < MAX_INGREDIENTS; i++) {
+        pthread_mutex_init(&ingredient_lock[i], NULL);
+    }
+
+    // Read the input parameters
+    printf("Enter the number of chefs: ");
+    scanf("%d", &num_chefs);
+
+    printf("Enter the maximum number of ingredients each chef can claim: ");
+    scanf("%d", &max_ingredients);
+
+    // Calculate the total number of ingredients
+    total_ingredients = num_chefs * max_ingredients;
+
+    // Create and run the chef threads
+    pthread_t threads[num_chefs];
+    int thread_ids[num_chefs];
+
+    for (int i = 0; i < num_chefs; i++) {
+        thread_ids[i] = i;
+        pthread_create(&threads[i], NULL, chef, (void *)&thread_ids[i]);
+    }
+
+    // Wait for all the chef threads to finish
+    for (int i = 0; i < num_chefs; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    // Cleanup the ingredient locks
+    for (int i = 0; i < MAX_INGREDIENTS; i++) {
+        pthread_mutex_destroy(&ingredient_lock[i]);
+    }
+
+    return 0;
+}
+
+Test Case:Single chef
